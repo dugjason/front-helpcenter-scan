@@ -156,7 +156,7 @@ export default function Home() {
             type="url"
             id="helpCenterUrl"
             name="helpCenterUrl"
-            placeholder="https://help.example.com"
+            placeholder="https://[your-subdomain].frontkb.com"
             required
             className="w-full p-3 border border-gray-300 rounded-md"
           />
