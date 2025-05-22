@@ -268,12 +268,14 @@ export async function streamSearchResults(
         
         // Process each article
         let foundCount = 0
+        let processedCount = 0
         
         for (const article of articles) {
           try {
             const response = await fetch(`${baseUrl}${article.json_content_url}`)
             if (!response.ok) {
               console.error(`Failed to fetch article ${article.id}: ${response.status}`)
+              processedCount++
               continue
             }
 
@@ -299,16 +301,22 @@ export async function streamSearchResults(
               }) + '\n'))
             }
             
-            // Update processing status
-            controller.enqueue(encoder.encode(JSON.stringify({ 
-              type: 'progress', 
-              data: { 
-                processed: foundCount, 
-                total: articles.length 
-              } 
-            }) + '\n'))
+            processedCount++
+            
+            // Send progress update every 25 articles to avoid overwhelming the client
+            if (processedCount % 25 === 0 || processedCount === articles.length) {
+              controller.enqueue(encoder.encode(JSON.stringify({ 
+                type: 'progress', 
+                data: { 
+                  processed: processedCount,
+                  found: foundCount,
+                  total: articles.length 
+                } 
+              }) + '\n'))
+            }
           } catch (error) {
             console.error(`Error processing article ${article.id}:`, error)
+            processedCount++
           }
         }
         
@@ -317,7 +325,7 @@ export async function streamSearchResults(
           type: 'complete', 
           data: { 
             totalFound: foundCount,
-            totalProcessed: articles.length
+            totalProcessed: processedCount
           } 
         }) + '\n'))
         
