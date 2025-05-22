@@ -15,6 +15,7 @@ export default function Home() {
   const [results, setResults] = useState<SearchMatch[]>([])
   const [progress, setProgress] = useState<ProgressState>({ processed: 0, total: 0 })
   const [searchComplete, setSearchComplete] = useState(false)
+  const [urlError, setUrlError] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -58,14 +59,49 @@ export default function Home() {
     }
   }
 
+  function validateUrl(url: string): boolean {
+    try {
+      new URL(url)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function handleUrlChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const url = event.target.value
+    if (url && !validateUrl(url)) {
+      setUrlError('Please enter a valid URL')
+    } else {
+      setUrlError('')
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    
+    // Get form data
+    const formData = new FormData(event.currentTarget)
+    const helpCenterUrl = formData.get('helpCenterUrl') as string
+    const searchTerm = formData.get('searchTerm') as string
+    
+    if (!helpCenterUrl || !searchTerm) {
+      alert('Both Knowledge Base URL and search term are required')
+      return
+    }
+    
+    // Validate URL
+    if (!validateUrl(helpCenterUrl)) {
+      setUrlError('Please enter a valid URL')
+      return
+    }
     
     // Reset state
     setLoading(true)
     setResults([])
     setProgress({ processed: 0, total: 0 })
     setSearchComplete(false)
+    setUrlError('')
     
     // Abort any existing request
     if (abortControllerRef.current) {
@@ -76,17 +112,6 @@ export default function Home() {
     abortControllerRef.current = new AbortController()
     
     try {
-      // Get form data
-      const formData = new FormData(event.currentTarget)
-      const helpCenterUrl = formData.get('helpCenterUrl') as string
-      const searchTerm = formData.get('searchTerm') as string
-      
-      if (!helpCenterUrl || !searchTerm) {
-        alert('Both Knowledge Base URL and search term are required')
-        setLoading(false)
-        return
-      }
-      
       // Make the request
       const response = await fetch('/api/search', {
         method: 'POST',
@@ -192,13 +217,21 @@ export default function Home() {
             type="url"
             id="helpCenterUrl"
             name="helpCenterUrl"
-            placeholder="https://[your-subdomain].frontkb.com"
+            placeholder="https://help.example.com"
             required
-            className="w-full p-3 border border-gray-300 rounded-md"
+            className={`w-full p-3 border rounded-md ${
+              urlError ? 'border-red-500 focus:border-red-500' : 'border-gray-300'
+            }`}
+            onChange={handleUrlChange}
           />
           <p className="mt-1 text-sm text-gray-500">
-            Enter the URL of a Front Knowledge Base knowledge base
+            Enter the URL of a Front Knowledge Base
           </p>
+          {urlError && (
+            <p className="mt-1 text-sm text-red-500">
+              {urlError}
+            </p>
+          )}
         </div>
 
         <div>
@@ -209,7 +242,6 @@ export default function Home() {
             type="text"
             id="searchTerm"
             name="searchTerm"
-            placeholder="API token"
             required
             className="w-full p-3 border border-gray-300 rounded-md"
           />
