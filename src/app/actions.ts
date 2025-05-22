@@ -104,7 +104,6 @@ async function processContent(
   baseUrl: string
 ): Promise<void> {
   for (const item of content) {
-    console.log(item)
     if (item.type === 'article') {
       articles.push(item)
     } else if (item.type === 'category') {
@@ -271,9 +270,6 @@ export async function streamSearchResults(
         let foundCount = 0
         
         for (const article of articles) {
-          console.log(article)
-          console.log("base", baseUrl)
-          console.log("articleContentUrl", article.json_content_url)
           try {
             const response = await fetch(`${baseUrl}${article.json_content_url}`)
             if (!response.ok) {
@@ -282,12 +278,10 @@ export async function streamSearchResults(
             }
 
             const articleResponse: ArticleResponse = await response.json()
-            console.log("articleResponse::", articleResponse)
             const { html_content, name, content_url } = articleResponse
             
             // Find matches in the article
             const matches = findMatchesInHtml(html_content, searchTerm)
-            console.log("matches", matches)
             if (matches.length > 0) {
               foundCount++
               
