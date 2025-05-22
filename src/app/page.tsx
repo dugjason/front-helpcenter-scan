@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { SearchMatch } from './actions'
 import Link from 'next/link';
-import { LinkIcon } from 'lucide-react';
+import { LinkIcon, Download } from 'lucide-react';
 
 type ProgressState = {
   processed: number;
@@ -14,6 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<SearchMatch[]>([])
   const [progress, setProgress] = useState<ProgressState>({ processed: 0, total: 0 })
+  const [searchComplete, setSearchComplete] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -26,6 +27,37 @@ export default function Home() {
     }
   }, [])
 
+  function exportToCsv() {
+    if (results.length === 0) return
+
+    // Create CSV headers
+    const headers = ['Article Name', 'Article URL', 'Category']
+    
+    // Create CSV rows
+    const rows = results.map(result => [
+      `"${result.articleTitle.replace(/"/g, '""')}"`, // Escape quotes in article title
+      `"${result.articleUrl}"`,
+      `"${result.categoryHierarchy ? result.categoryHierarchy.join(' > ') : ''}"`
+    ])
+    
+    // Combine headers and rows
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n')
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `search_results_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     
@@ -33,6 +65,7 @@ export default function Home() {
     setLoading(true)
     setResults([])
     setProgress({ processed: 0, total: 0 })
+    setSearchComplete(false)
     
     // Abort any existing request
     if (abortControllerRef.current) {
@@ -109,6 +142,7 @@ export default function Home() {
                 
               case 'complete':
                 console.log('Search complete:', event.data)
+                setSearchComplete(true)
                 break
                 
               default:
@@ -232,7 +266,19 @@ export default function Home() {
 
       {results.length > 0 && (
         <div className="space-y-6">
-          <h2 className="text-xl font-bold">Search Results ({results.length})</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Search Results ({results.length})</h2>
+            
+            {searchComplete && (
+              <button
+                onClick={exportToCsv}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                <Download size={16} />
+                <span>Export to CSV</span>
+              </button>
+            )}
+          </div>
           
           {results.map((result) => (
             <div key={result.articleId} className="p-6 bg-white rounded-lg shadow-md">
