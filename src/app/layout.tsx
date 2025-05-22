@@ -6,7 +6,7 @@ import Link from 'next/link'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Front Knowldege Base Scanner',
+  title: 'Front Knowledge Base Scanner',
   description: 'Search for content across a Front Knowledge Base',
 }
 

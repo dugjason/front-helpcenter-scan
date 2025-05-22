@@ -68,7 +68,7 @@ export type SearchMatch = {
   }[]
 }
 
-// Helper function to get base URL from knowldege base URL
+// Helper function to get base URL from knowledge base URL
 function getBaseUrl(url: string): string {
   try {
     const parsedUrl = new URL(url)
@@ -234,8 +234,8 @@ export async function searchHelpCenter(
     
     return results
   } catch (error) {
-    console.error('Error searching knowldege base:', error)
-    throw new Error('Failed to search the knowldege base')
+    console.error('Error searching knowledge base:', error)
+    throw new Error('Failed to search the knowledge base')
   }
 }
 
@@ -247,7 +247,7 @@ export async function streamSearchResults(
   const searchTerm = formData.get('searchTerm') as string
   
   if (!helpCenterUrl || !searchTerm) {
-    throw new Error('Knowldege Base URL and search term are required')
+    throw new Error('Knowledge Base URL and search term are required')
   }
   
   // Create a new ReadableStream

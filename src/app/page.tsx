@@ -48,7 +48,7 @@ export default function Home() {
       const searchTerm = formData.get('searchTerm') as string
       
       if (!helpCenterUrl || !searchTerm) {
-        alert('Both Knowldege Base URL and search term are required')
+        alert('Both Knowledge Base URL and search term are required')
         setLoading(false)
         return
       }
@@ -142,7 +142,7 @@ export default function Home() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">Front Knowldege Base Scanner</h1>
+        <h1 className="text-3xl font-bold mb-4">Front Knowledge Base Scanner</h1>
         <p className="text-gray-600">
           Search for content across a <Link href="https://front.com/product/knowledge-base" className="font-semibold text-[#A857F1] hover:underline" target="_blank" rel="noopener noreferrer">Front Knowledge Base</Link> using the knowledge base public API.
         </p>
@@ -151,7 +151,7 @@ export default function Home() {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg shadow-md border border-gray-100">
         <div>
           <label htmlFor="helpCenterUrl" className="block mb-2 font-medium">
-            Knowldege Base URL
+            Knowledge Base URL
           </label>
           <input
             type="url"
@@ -162,7 +162,7 @@ export default function Home() {
             className="w-full p-3 border border-gray-300 rounded-md"
           />
           <p className="mt-1 text-sm text-gray-500">
-            Enter the URL of a Front Knowledge Base knowldege base
+            Enter the URL of a Front Knowledge Base knowledge base
           </p>
         </div>
 
