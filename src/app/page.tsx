@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { SearchMatch } from './actions'
 import Link from 'next/link';
+import { LinkIcon } from 'lucide-react';
 
 type ProgressState = {
   processed: number;
@@ -246,9 +247,20 @@ export default function Home() {
                 </a>
               </h3>
               
-              <p className="text-sm text-gray-500 mb-4">
-                {result.articleUrl}
-              </p>
+              {result.categoryHierarchy && result.categoryHierarchy.length > 0 && (
+                <div className="text-sm text-gray-600 mb-2 flex items-center">
+                  <span className="ml-2">
+                    {result.categoryHierarchy.join(' > ')}
+                  </span>
+                </div>
+              )}
+              
+              <div className="text-sm text-gray-500 mb-4">
+                <Link href={result.articleUrl} target="_blank" rel="noopener noreferrer" className=" hover:underline">
+                  <LinkIcon size={12} className="mr-1 inline-block" />
+                  {result.articleUrl.replace(/^https?:\/\//, '')}
+                </Link>
+              </div>
               
               <div className="space-y-4">
                 {result.matches.map((match, index) => (
@@ -257,7 +269,7 @@ export default function Home() {
                       {match.heading}
                     </p>
                     <p 
-                      className="text-gray-800"
+                      className="text-gray-800 text-sm"
                       dangerouslySetInnerHTML={{ __html: match.highlightedContext }}
                     />
                   </div>

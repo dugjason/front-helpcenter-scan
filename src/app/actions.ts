@@ -57,10 +57,16 @@ type ArticleResponse = {
   parent_category_id?: number
 }
 
+// New type to store article paths
+type ArticlePathInfo = ArticleContent & {
+  categoryPath: string[]
+}
+
 export type SearchMatch = {
   articleId: number
   articleTitle: string
   articleUrl: string
+  categoryHierarchy: string[]
   matches: {
     heading: string
     context: string
@@ -79,8 +85,8 @@ function getBaseUrl(url: string): string {
 }
 
 // Function to fetch all article IDs by traversing the knowledge base structure
-async function getAllArticleIds(baseUrlParam: string): Promise<ArticleContent[]> {
-  const articles: ArticleContent[] = []
+async function getAllArticleIds(baseUrlParam: string): Promise<ArticlePathInfo[]> {
+  const articles: ArticlePathInfo[] = []
 
   // Strip the URL to just the domain+subdomain
   const baseUrl = new URL(baseUrlParam).origin
@@ -92,20 +98,24 @@ async function getAllArticleIds(baseUrlParam: string): Promise<ArticleContent[]>
   }
   const homeResponse: HomeResponse = await response.json()
   
-  // Process content recursively
-  await processContent(homeResponse.content, articles, baseUrl)
+  // Process content recursively, starting with "Home" as the root of the path
+  await processContent(homeResponse.content, articles, baseUrl, [homeResponse.name])
   
   return articles
 }
 
 async function processContent(
   content: ContentItem[],
-  articles: ArticleContent[],
-  baseUrl: string
+  articles: ArticlePathInfo[],
+  baseUrl: string,
+  categoryPath: string[] = []
 ): Promise<void> {
   for (const item of content) {
     if (item.type === 'article') {
-      articles.push(item)
+      articles.push({
+        ...item,
+        categoryPath: [...categoryPath]
+      })
     } else if (item.type === 'category') {
       const response = await fetch(`${baseUrl}${item.json_content_url}`)
       if (!response.ok) {
@@ -113,9 +123,11 @@ async function processContent(
         continue
       }
       const categoryResponse: CategoryResponse = await response.json()
-      await processContent(categoryResponse.content, articles, baseUrl)
+      // Add the category name to the path and continue processing
+      await processContent(categoryResponse.content, articles, baseUrl, [...categoryPath, categoryResponse.name])
     } else if (item.type === 'section') {
-      await processContent(item.content, articles, baseUrl)
+      // For sections, we include the section name in the path
+      await processContent(item.content, articles, baseUrl, [...categoryPath, item.name])
     }
     // Skip resource_link type as it doesn't contain articles
   }
@@ -222,6 +234,7 @@ export async function searchHelpCenter(
             articleId: article.id,
             articleTitle: name,
             articleUrl: `${baseUrl}${content_url}`,
+            categoryHierarchy: article.categoryPath,
             matches
           }
           
@@ -292,6 +305,7 @@ export async function streamSearchResults(
                 articleId: article.id,
                 articleTitle: name,
                 articleUrl: `${baseUrl}${content_url}`,
+                categoryHierarchy: article.categoryPath,
                 matches
               }
               
