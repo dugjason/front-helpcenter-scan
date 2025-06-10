@@ -32,7 +32,7 @@ pnpm install
 pnpm dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+4. Open [https://localhost:3000](https://localhost:3000) in your browser
 
 ## Usage
 
@@ -44,8 +44,8 @@ pnpm dev
 
 ## Technology Stack
 
-- Next.js 14
-- React 18
+- Next.js 15
+- React 19
 - Tailwind CSS
 - Server-side Actions
 - Edge Runtime
@@ -56,7 +56,3 @@ pnpm dev
 The application uses Front's public Knowledge Base API to traverse the structure of a knowledge base, fetching all articles and searching for the specified term. When a match is found, it extracts the context around the match and highlights the search term.
 
 The search process runs on the server using Next.js Server Actions and Edge Runtime for better performance. Results are streamed back to the client in real-time as they are found, providing a responsive user experience even with large knowledge bases.
-
-## License
-
-ISC 
