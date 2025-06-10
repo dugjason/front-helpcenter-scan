@@ -150,6 +150,18 @@ function findMatchesInHtml(html: string, searchTerm: string): { heading: string,
     const headingText = match[2].replace(/<.*?>/g, '') // Remove any HTML tags inside heading
     const headingIndex = match.index
     
+    // Check if the heading itself contains the search term
+    if (headingText.toLowerCase().includes(searchTermLower)) {
+      matches.push({
+        heading: lastHeading,
+        context: headingText.trim(),
+        highlightedContext: headingText.trim().replace(
+          new RegExp(`(${searchTerm})`, 'gi'),
+          '<mark>$1</mark>'
+        )
+      })
+    }
+    
     // Get content between this heading and the next one
     if (lastIndex > 0) {
       const sectionHtml = html.substring(lastIndex, headingIndex)
