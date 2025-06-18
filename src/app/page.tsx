@@ -383,7 +383,7 @@ export default function Home() {
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
                 <Download size={16} />
-                <span>Export to CSV</span>
+                <span>Export search results to CSV</span>
               </button>
             )}
           </div>
