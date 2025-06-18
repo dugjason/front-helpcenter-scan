@@ -75,7 +75,7 @@ export type SearchMatch = {
 }
 
 // Helper function to get base URL from knowledge base URL
-function getBaseUrl(url: string): string {
+export function getBaseUrl(url: string): string {
   try {
     const parsedUrl = new URL(url)
     return `${parsedUrl.protocol}//${parsedUrl.host}`
@@ -85,7 +85,7 @@ function getBaseUrl(url: string): string {
 }
 
 // Function to fetch all article IDs by traversing the knowledge base structure
-async function getAllArticleIds(baseUrlParam: string): Promise<ArticlePathInfo[]> {
+export async function getAllArticleIds(baseUrlParam: string): Promise<ArticlePathInfo[]> {
   const articles: ArticlePathInfo[] = []
 
   // Strip the URL to just the domain+subdomain

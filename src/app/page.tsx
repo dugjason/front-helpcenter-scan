@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { SearchMatch } from './actions'
-import Link from 'next/link';
+import { toast } from 'sonner';
 import { LinkIcon, Download } from 'lucide-react';
+import Link from 'next/link';
+
+import { SearchMatch } from './actions'
+import { downloadCsv, formatSearchResultsForCsv, generateCsvContent } from './utils/csv';
 
 type ProgressState = {
   processed: number;
@@ -12,6 +15,7 @@ type ProgressState = {
 
 export default function Home() {
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [results, setResults] = useState<SearchMatch[]>([])
   const [progress, setProgress] = useState<ProgressState>({ processed: 0, total: 0 })
   const [searchComplete, setSearchComplete] = useState(false)
@@ -30,32 +34,90 @@ export default function Home() {
 
   function exportToCsv() {
     if (results.length === 0) return
+    const rows = formatSearchResultsForCsv(results)
+    const csvContent = generateCsvContent(rows)
+    downloadCsv(csvContent, `search_results_${new Date().toISOString().split('T')[0]}.csv`)
+  }
 
-    // Create CSV headers
-    const headers = ['Article Name', 'Article URL', 'Category']
+  async function handleFullExport() {
+    const formData = new FormData(formRef.current!)
+    const helpCenterUrl = formData.get('helpCenterUrl') as string
     
-    // Create CSV rows
-    const rows = results.map(result => [
-      `"${result.articleTitle.replace(/"/g, '""')}"`, // Escape quotes in article title
-      `"${result.articleUrl}"`,
-      `"${result.categoryHierarchy ? result.categoryHierarchy.join(' > ') : ''}"`
-    ])
+    if (!helpCenterUrl) {
+      alert('Knowledge Base URL is required')
+      return
+    }
     
-    // Combine headers and rows
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n')
+    if (!validateUrl(helpCenterUrl)) {
+      setUrlError('Please enter a valid URL')
+      return
+    }
     
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
+    setExporting(true)
+    const toastId = toast.loading('Starting export...')
     
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `search_results_${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      
+      if (!reader) {
+        throw new Error('Failed to get response reader')
+      }
+
+      let csvContent = ''
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          break
+        }
+        
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6))
+              
+              if (event.type === 'progress') {
+                const percent = Math.round((event.processed / event.total) * 100)
+                toast.loading(
+                  `Exporting articles... ${event.processed} of ${event.total} (${percent}%)`,
+                  { id: toastId }
+                )
+              } else if (event.type === 'complete') {
+                toast.success(
+                  `Export complete! ${event.processed} articles exported.`,
+                  { id: toastId }
+                )
+              }
+            } catch (e) {
+              console.error('Error parsing event:', e)
+            }
+          } else {
+            csvContent += line + '\n'
+          }
+        }
+      }
+      
+      // Download the CSV
+      downloadCsv(csvContent, `kb-export-${new Date().toISOString().split('T')[0]}.csv`)
+    } catch (error) {
+      console.error('Export error:', error)
+      toast.error('An error occurred while exporting. Please try again.', { id: toastId })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -250,12 +312,26 @@ export default function Home() {
         <div className="flex space-x-4">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || exporting}
             className={`flex-1 py-3 px-4 rounded-md text-white font-medium ${
               loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {loading ? 'Searching...' : 'Search'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleFullExport}
+            disabled={loading || exporting}
+            className={`py-3 px-4 rounded-md font-medium border flex items-center space-x-2 ${
+              exporting 
+                ? 'bg-gray-100 text-gray-500 border-gray-300'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <Download size={16} />
+            <span>{exporting ? 'Exporting...' : 'Export All'}</span>
           </button>
           
           {loading && (
