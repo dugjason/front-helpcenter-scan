@@ -44,7 +44,7 @@ export default function Home() {
     const helpCenterUrl = formData.get('helpCenterUrl') as string
     
     if (!helpCenterUrl) {
-      alert('Knowledge Base URL is required')
+      toast.error('Knowledge Base URL is required')
       return
     }
     
@@ -148,7 +148,7 @@ export default function Home() {
     const searchTerm = formData.get('searchTerm') as string
     
     if (!helpCenterUrl || !searchTerm) {
-      alert('Both Knowledge Base URL and search term are required')
+      toast.error('Both Knowledge Base URL and search term are required')
       return
     }
     
@@ -245,7 +245,7 @@ export default function Home() {
         console.log('Request was aborted')
       } else {
         console.error('Error during search:', error)
-        alert('An error occurred while searching. Please check the URL and try again.')
+        toast.error('An error occurred while searching. Please check the URL and try again.')
       }
     } finally {
       setLoading(false)
