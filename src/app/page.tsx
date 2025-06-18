@@ -74,45 +74,49 @@ export default function Home() {
       }
 
       let csvContent = ''
+      let total = 0
+      let processed = 0
+      let buffer = ''
       
       while (true) {
         const { done, value } = await reader.read()
-        
-        if (done) {
-          break
-        }
+        if (done) break
         
         const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
+        buffer += chunk
+        
+        // Process complete lines
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep the last incomplete line in the buffer
         
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6))
-              
-              if (event.type === 'progress') {
-                const percent = Math.round((event.processed / event.total) * 100)
-                toast.loading(
-                  `Exporting articles... ${event.processed} of ${event.total} (${percent}%)`,
-                  { id: toastId }
-                )
-              } else if (event.type === 'complete') {
-                toast.success(
-                  `Export complete! ${event.processed} articles exported.`,
-                  { id: toastId }
-                )
-              }
-            } catch (e) {
-              console.error('Error parsing event:', e)
-            }
-          } else {
-            csvContent += line + '\n'
+          if (line.startsWith('# total:')) {
+            total = Number.parseInt(line.split(':')[1].trim(), 10)
+            toast.loading(`Starting export of ${total} articles...`, { id: toastId })
+            continue
           }
+          
+          if (line.trim() && !line.startsWith('Article Name')) {
+            processed++
+            if (processed % 10 === 0 || processed === total) {
+              const percent = Math.round((processed / total) * 100)
+              toast.loading("Exporting articles",
+                { 
+                  id: toastId, 
+                  description: <span className="tabular-nums">{processed} of {total} ({percent}%)</span> 
+                }
+              )
+            }
+          }
+          
+          csvContent += line + '\n'
         }
       }
       
       // Download the CSV
       downloadCsv(csvContent, `kb-export-${new Date().toISOString().split('T')[0]}.csv`)
+      toast.success(`Export complete! ${processed} articles exported.`, { id: toastId })
+
     } catch (error) {
       console.error('Export error:', error)
       toast.error('An error occurred while exporting. Please try again.', { id: toastId })
