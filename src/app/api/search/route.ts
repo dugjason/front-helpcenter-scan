@@ -1,5 +1,5 @@
-import { streamSearchResults } from '../../actions'
-import { NextRequest } from 'next/server'
+import type { NextRequest } from "next/server"
+import { streamSearchResults } from "../../actions"
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData()
@@ -7,4 +7,4 @@ export async function POST(request: NextRequest) {
 }
 
 // Set the runtime to edge for better streaming support
-export const runtime = 'edge' 
+export const runtime = "edge"
