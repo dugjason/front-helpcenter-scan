@@ -1,16 +1,16 @@
-'use client'
+"use client"
 
-import { useState, useEffect, useRef } from 'react'
-import { toast } from 'sonner';
-import { LinkIcon, Download } from 'lucide-react';
-import Link from 'next/link';
+import { Download, LinkIcon } from "lucide-react"
+import Link from "next/link"
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 
-import { SearchMatch } from './actions'
-import { downloadCsv, formatSearchResultsForCsv, generateCsvContent } from './utils/csv';
+import type { SearchMatch } from "./actions"
+import { downloadCsv, formatSearchResultsForCsv, generateCsvContent } from "./utils/csv"
 
 type ProgressState = {
-  processed: number;
-  total: number;
+  processed: number
+  total: number
 }
 
 export default function Home() {
@@ -19,7 +19,8 @@ export default function Home() {
   const [results, setResults] = useState<SearchMatch[]>([])
   const [progress, setProgress] = useState<ProgressState>({ processed: 0, total: 0 })
   const [searchComplete, setSearchComplete] = useState(false)
-  const [urlError, setUrlError] = useState<string>('')
+  const [urlError, setUrlError] = useState<string>("")
+  const [searchHtml, setSearchHtml] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -36,90 +37,93 @@ export default function Home() {
     if (results.length === 0) return
     const rows = formatSearchResultsForCsv(results)
     const csvContent = generateCsvContent(rows)
-    downloadCsv(csvContent, `search_results_${new Date().toISOString().split('T')[0]}.csv`)
+    downloadCsv(csvContent, `search_results_${new Date().toISOString().split("T")[0]}.csv`)
   }
 
   async function handleFullExport() {
     const formData = new FormData(formRef.current!)
-    const helpCenterUrl = formData.get('helpCenterUrl') as string
-    
+    const helpCenterUrl = formData.get("helpCenterUrl") as string
+
     if (!helpCenterUrl) {
-      toast.error('Knowledge Base URL is required')
+      toast.error("Knowledge Base URL is required")
       return
     }
-    
+
     if (!validateUrl(helpCenterUrl)) {
-      setUrlError('Please enter a valid URL')
+      setUrlError("Please enter a valid URL")
       return
     }
-    
+
+    formData.set("searchHtml", searchHtml ? "true" : "false")
+
     setExporting(true)
-    const toastId = toast.loading('Starting export...')
-    
+    const toastId = toast.loading("Starting export...")
+
     try {
-      const response = await fetch('/api/export', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/export", {
+        method: "POST",
+        body: formData,
       })
-      
+
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`)
       }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-      
+
       if (!reader) {
-        throw new Error('Failed to get response reader')
+        throw new Error("Failed to get response reader")
       }
 
-      let csvContent = ''
+      let csvContent = ""
       let total = 0
       let processed = 0
-      let buffer = ''
-      
+      let buffer = ""
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        
+
         const chunk = decoder.decode(value, { stream: true })
         buffer += chunk
-        
+
         // Process complete lines
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep the last incomplete line in the buffer
-        
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || "" // Keep the last incomplete line in the buffer
+
         for (const line of lines) {
-          if (line.startsWith('# total:')) {
-            total = Number.parseInt(line.split(':')[1].trim(), 10)
+          if (line.startsWith("# total:")) {
+            total = Number.parseInt(line.split(":")[1].trim(), 10)
             toast.loading(`Starting export of ${total} articles...`, { id: toastId })
             continue
           }
-          
-          if (line.trim() && !line.startsWith('Article Name')) {
+
+          if (line.trim() && !line.startsWith("Article Name")) {
             processed++
             if (processed % 10 === 0 || processed === total) {
               const percent = Math.round((processed / total) * 100)
-              toast.loading("Exporting articles",
-                { 
-                  id: toastId, 
-                  description: <span className="tabular-nums">{processed} of {total} ({percent}%)</span> 
-                }
-              )
+              toast.loading("Exporting articles", {
+                id: toastId,
+                description: (
+                  <span className="tabular-nums">
+                    {processed} of {total} ({percent}%)
+                  </span>
+                ),
+              })
             }
           }
-          
-          csvContent += line + '\n'
+
+          csvContent += `${line}\n`
         }
       }
-      
-      // Download the CSV
-      downloadCsv(csvContent, `kb-export-${new Date().toISOString().split('T')[0]}.csv`)
-      toast.success(`Export complete! ${processed} articles exported.`, { id: toastId })
 
+      // Download the CSV
+      downloadCsv(csvContent, `kb-export-${new Date().toISOString().split("T")[0]}.csv`)
+      toast.success(`Export complete! ${processed} articles exported.`, { id: toastId })
     } catch (error) {
-      console.error('Export error:', error)
-      toast.error('An error occurred while exporting. Please try again.', { id: toastId })
+      console.error("Export error:", error)
+      toast.error("An error occurred while exporting. Please try again.", { id: toastId })
     } finally {
       setExporting(false)
     }
@@ -137,119 +141,122 @@ export default function Home() {
   function handleUrlChange(event: React.ChangeEvent<HTMLInputElement>) {
     const url = event.target.value
     if (url && !validateUrl(url)) {
-      setUrlError('Please enter a valid URL')
+      setUrlError("Please enter a valid URL")
     } else {
-      setUrlError('')
+      setUrlError("")
     }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    
+
     // Get form data
     const formData = new FormData(event.currentTarget)
-    const helpCenterUrl = formData.get('helpCenterUrl') as string
-    const searchTerm = formData.get('searchTerm') as string
-    
+    formData.set("searchHtml", searchHtml ? "true" : "false")
+    const helpCenterUrl = formData.get("helpCenterUrl") as string
+    const searchTerm = formData.get("searchTerm") as string
+
     if (!helpCenterUrl || !searchTerm) {
-      toast.error('Both Knowledge Base URL and search term are required')
+      toast.error("Both Knowledge Base URL and search term are required")
       return
     }
-    
+
     // Validate URL
     if (!validateUrl(helpCenterUrl)) {
-      setUrlError('Please enter a valid URL')
+      setUrlError("Please enter a valid URL")
       return
     }
-    
+
+    formData.set("searchHtml", searchHtml ? "true" : "false")
+
     // Reset state
     setLoading(true)
     setResults([])
     setProgress({ processed: 0, total: 0 })
     setSearchComplete(false)
-    setUrlError('')
-    
+    setUrlError("")
+
     // Abort any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+
     // Create a new abort controller
     abortControllerRef.current = new AbortController()
-    
+
     try {
       // Make the request
-      const response = await fetch('/api/search', {
-        method: 'POST',
+      const response = await fetch("/api/search", {
+        method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal
+        signal: abortControllerRef.current.signal,
       })
-      
+
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`)
       }
-      
+
       // Handle the streaming response
       const reader = response.body?.getReader()
       if (!reader) {
-        throw new Error('Failed to get response reader')
+        throw new Error("Failed to get response reader")
       }
-      
+
       const decoder = new TextDecoder()
-      let buffer = ''
-      
+      let buffer = ""
+
       while (true) {
         const { done, value } = await reader.read()
-        
+
         if (done) {
           break
         }
-        
+
         // Decode the chunk and add it to our buffer
         buffer += decoder.decode(value, { stream: true })
-        
+
         // Process complete lines in the buffer
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep the last incomplete line in the buffer
-        
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || "" // Keep the last incomplete line in the buffer
+
         for (const line of lines) {
-          if (line.trim() === '') continue
-          
+          if (line.trim() === "") continue
+
           try {
             const event = JSON.parse(line)
-            
+
             switch (event.type) {
-              case 'info':
-                setProgress(prev => ({ ...prev, total: event.data.totalArticles }))
+              case "info":
+                setProgress((prev) => ({ ...prev, total: event.data.totalArticles }))
                 break
-                
-              case 'result':
-                setResults(prev => [...prev, event.data])
+
+              case "result":
+                setResults((prev) => [...prev, event.data])
                 break
-                
-              case 'progress':
+
+              case "progress":
                 setProgress(event.data)
                 break
-                
-              case 'complete':
-                console.log('Search complete:', event.data)
+
+              case "complete":
+                console.log("Search complete:", event.data)
                 setSearchComplete(true)
                 break
-                
+
               default:
-                console.warn('Unknown event type:', event.type)
+                console.warn("Unknown event type:", event.type)
             }
           } catch (e) {
-            console.error('Error parsing event:', e, line)
+            console.error("Error parsing event:", e, line)
           }
         }
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        console.log('Request was aborted')
+      if (error instanceof DOMException && error.name === "AbortError") {
+        console.log("Request was aborted")
       } else {
-        console.error('Error during search:', error)
-        toast.error('An error occurred while searching. Please check the URL and try again.')
+        console.error("Error during search:", error)
+        toast.error("An error occurred while searching. Please check the URL and try again.")
       }
     } finally {
       setLoading(false)
@@ -270,11 +277,24 @@ export default function Home() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-4">Front Knowledge Base Scanner</h1>
         <p className="text-gray-600">
-          Search for content across a <Link href="https://front.com/product/knowledge-base" className="font-semibold text-[#A857F1] hover:underline" target="_blank" rel="noopener noreferrer">Front Knowledge Base</Link> using the knowledge base public API.
+          Search for content across a{" "}
+          <Link
+            href="https://front.com/product/knowledge-base"
+            className="font-semibold text-[#A857F1] hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Front Knowledge Base
+          </Link>{" "}
+          using the knowledge base public API.
         </p>
       </div>
 
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg shadow-md border border-gray-100">
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="space-y-4 p-6 bg-white rounded-lg shadow-md border border-gray-100"
+      >
         <div>
           <label htmlFor="helpCenterUrl" className="block mb-2 font-medium">
             Knowledge Base URL
@@ -286,18 +306,12 @@ export default function Home() {
             placeholder="https://help.example.com"
             required
             className={`w-full p-3 border rounded-md ${
-              urlError ? 'border-red-500 focus:border-red-500' : 'border-gray-300'
+              urlError ? "border-red-500 focus:border-red-500" : "border-gray-300"
             }`}
             onChange={handleUrlChange}
           />
-          <p className="mt-1 text-sm text-gray-500">
-            Enter the URL of a Front Knowledge Base
-          </p>
-          {urlError && (
-            <p className="mt-1 text-sm text-red-500">
-              {urlError}
-            </p>
-          )}
+          <p className="mt-1 text-sm text-gray-500">Enter the URL of a Front Knowledge Base</p>
+          {urlError && <p className="mt-1 text-sm text-red-500">{urlError}</p>}
         </div>
 
         <div>
@@ -318,26 +332,26 @@ export default function Home() {
             type="submit"
             disabled={loading || exporting}
             className={`flex-1 py-3 px-4 rounded-md text-white font-medium ${
-              loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+              loading ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            {loading ? 'Searching...' : 'Search'}
+            {loading ? "Searching..." : "Search"}
           </button>
-          
+
           <button
             type="button"
             onClick={handleFullExport}
             disabled={loading || exporting}
             className={`py-3 px-4 rounded-md font-medium border flex items-center space-x-2 ${
-              exporting 
-                ? 'bg-gray-100 text-gray-500 border-gray-300'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              exporting
+                ? "bg-gray-100 text-gray-500 border-gray-300"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
           >
             <Download size={16} />
-            <span>{exporting ? 'Exporting...' : 'Export All'}</span>
+            <span>{exporting ? "Exporting..." : "Export All"}</span>
           </button>
-          
+
           {loading && (
             <button
               type="button"
@@ -358,19 +372,19 @@ export default function Home() {
               {progress.processed} / {progress.total} articles processed
             </span>
           </div>
-          
+
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-blue-600 transition-all duration-300 ease-in-out"
-              style={{ 
-                width: progress.total ? `${(progress.processed / progress.total) * 100}%` : '0%' 
+              style={{
+                width: progress.total ? `${(progress.processed / progress.total) * 100}%` : "0%",
               }}
             />
           </div>
-          
+
           {results.length > 0 && (
             <p className="mt-2 text-sm text-green-600">
-              Found matches in {results.length} article{results.length !== 1 ? 's' : ''}
+              Found matches in {results.length} article{results.length !== 1 ? "s" : ""}
             </p>
           )}
         </div>
@@ -380,9 +394,10 @@ export default function Home() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Search Results ({results.length})</h2>
-            
+
             {searchComplete && (
               <button
+                type="button"
                 onClick={exportToCsv}
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
@@ -391,42 +406,44 @@ export default function Home() {
               </button>
             )}
           </div>
-          
+
           {results.map((result) => (
             <div key={result.articleId} className="p-6 bg-white rounded-lg shadow-md">
               <h3 className="text-lg font-semibold mb-2">
-                <a 
-                  href={result.articleUrl} 
-                  target="_blank" 
+                <a
+                  href={result.articleUrl}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
                 >
                   {result.articleTitle}
                 </a>
               </h3>
-              
+
               {result.categoryHierarchy && result.categoryHierarchy.length > 0 && (
                 <div className="text-sm text-gray-600 mb-2 flex items-center">
-                  <span className="ml-2">
-                    {result.categoryHierarchy.join(' > ')}
-                  </span>
+                  <span className="ml-2">{result.categoryHierarchy.join(" > ")}</span>
                 </div>
               )}
-              
+
               <div className="text-sm text-gray-500 mb-4">
-                <Link href={result.articleUrl} target="_blank" rel="noopener noreferrer" className=" hover:underline">
+                <Link
+                  href={result.articleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className=" hover:underline"
+                >
                   <LinkIcon size={12} className="mr-1 inline-block" />
-                  {result.articleUrl.replace(/^https?:\/\//, '')}
+                  {result.articleUrl.replace(/^https?:\/\//, "")}
                 </Link>
               </div>
-              
+
               <div className="space-y-4">
                 {result.matches.map((match, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                   <div key={index} className="border-l-4 border-blue-500 pl-4">
-                    <p className="font-medium text-gray-700 mb-1">
-                      {match.heading}
-                    </p>
-                    <p 
+                    <p className="font-medium text-gray-700 mb-1">{match.heading}</p>
+                    <p
                       className="text-gray-800 text-sm"
                       dangerouslySetInnerHTML={{ __html: match.highlightedContext }}
                     />
@@ -445,4 +462,4 @@ export default function Home() {
       )}
     </div>
   )
-} 
+}
