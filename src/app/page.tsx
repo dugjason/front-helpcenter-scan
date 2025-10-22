@@ -35,14 +35,19 @@ export default function Home() {
 
   function exportToCsv() {
     if (results.length === 0) return
-    const rows = formatSearchResultsForCsv(results)
+    const rows = formatSearchResultsForCsv(results, searchHtml)
     const csvContent = generateCsvContent(rows)
     downloadCsv(csvContent, `search_results_${new Date().toISOString().split("T")[0]}.csv`)
   }
 
   async function handleFullExport() {
-    const formData = new FormData(formRef.current!)
+    if (!formRef.current) {
+      toast.error("Form not available")
+      return
+    }
+    const formData = new FormData(formRef.current)
     const helpCenterUrl = formData.get("helpCenterUrl") as string
+    const searchTerm = formData.get("searchTerm") as string
 
     if (!helpCenterUrl) {
       toast.error("Knowledge Base URL is required")
@@ -54,7 +59,11 @@ export default function Home() {
       return
     }
 
+    // Set the search parameters for the export
     formData.set("searchHtml", searchHtml ? "true" : "false")
+    if (searchTerm) {
+      formData.set("searchTerm", searchTerm)
+    }
 
     setExporting(true)
     const toastId = toast.loading("Starting export...")
@@ -95,7 +104,12 @@ export default function Home() {
         for (const line of lines) {
           if (line.startsWith("# total:")) {
             total = Number.parseInt(line.split(":")[1].trim(), 10)
-            toast.loading(`Starting export of ${total} articles...`, { id: toastId })
+            // Check if this is a search results export by looking at the header
+            const isSearchExport = csvContent.includes("Match Context")
+            toast.loading(
+              `Starting export of ${total} ${isSearchExport ? "search results" : "articles"}...`,
+              { id: toastId },
+            )
             continue
           }
 
@@ -103,7 +117,8 @@ export default function Home() {
             processed++
             if (processed % 10 === 0 || processed === total) {
               const percent = Math.round((processed / total) * 100)
-              toast.loading("Exporting articles", {
+              const isSearchExport = csvContent.includes("Match Context")
+              toast.loading(`Exporting ${isSearchExport ? "search results" : "articles"}`, {
                 id: toastId,
                 description: (
                   <span className="tabular-nums">
@@ -119,8 +134,15 @@ export default function Home() {
       }
 
       // Download the CSV
-      downloadCsv(csvContent, `kb-export-${new Date().toISOString().split("T")[0]}.csv`)
-      toast.success(`Export complete! ${processed} articles exported.`, { id: toastId })
+      const isSearchExport = csvContent.includes("Match Context")
+      downloadCsv(
+        csvContent,
+        `${isSearchExport ? "search-results" : "kb"}-export-${new Date().toISOString().split("T")[0]}.csv`,
+      )
+      toast.success(
+        `Export complete! ${processed} ${isSearchExport ? "search results" : "articles"} exported.`,
+        { id: toastId },
+      )
     } catch (error) {
       console.error("Export error:", error)
       toast.error("An error occurred while exporting. Please try again.", { id: toastId })
@@ -152,7 +174,6 @@ export default function Home() {
 
     // Get form data
     const formData = new FormData(event.currentTarget)
-    formData.set("searchHtml", searchHtml ? "true" : "false")
     const helpCenterUrl = formData.get("helpCenterUrl") as string
     const searchTerm = formData.get("searchTerm") as string
 
@@ -272,6 +293,58 @@ export default function Home() {
     }
   }
 
+  function handleSearchHtmlChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextValue = event.target.checked
+    if (loading && abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setLoading(false)
+    }
+    setSearchHtml(nextValue)
+    setResults([])
+    setProgress({ processed: 0, total: 0 })
+    setSearchComplete(false)
+  }
+
+  // Escape HTML entities for safe display
+  function escapeHtml(text: string): string {
+    const div = document.createElement("div")
+    div.textContent = text
+    return div.innerHTML
+  }
+
+  // Render match content based on search mode
+  function renderMatchContent(match: {
+    heading: string
+    context: string
+    highlightedContext: string
+  }) {
+    if (searchHtml) {
+      // In raw HTML mode, escape the HTML and show it as text
+      return (
+        <pre className="text-gray-800 text-sm font-mono text-xs bg-gray-50 p-2 rounded overflow-x-auto">
+          {/* eslint-disable-next-line react/no-danger-with-children */}
+          <code
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
+            dangerouslySetInnerHTML={{
+              __html: escapeHtml(match.highlightedContext)
+                .replace(/<mark>/g, '<mark class="bg-yellow-200">')
+                .replace(/<\/mark>/g, "</mark>"),
+            }}
+          />
+        </pre>
+      )
+    }
+    // In text mode, render HTML normally
+    return (
+      <p
+        className="text-gray-800 text-sm"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
+        dangerouslySetInnerHTML={{ __html: match.highlightedContext }}
+      />
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="mb-8">
@@ -327,6 +400,26 @@ export default function Home() {
           />
         </div>
 
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="searchHtml"
+              name="searchHtml"
+              checked={searchHtml}
+              onChange={handleSearchHtmlChange}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">
+              Search within raw HTML content (includes URLs and markup)
+            </span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            When enabled, searches will include HTML tags and attributes in results. Results will be
+            shown as escaped text.
+          </p>
+        </div>
+
         <div className="flex space-x-4">
           <button
             type="submit"
@@ -349,7 +442,7 @@ export default function Home() {
             }`}
           >
             <Download size={16} />
-            <span>{exporting ? "Exporting..." : "Export All"}</span>
+            <span>{exporting ? "Exporting..." : "Export"}</span>
           </button>
 
           {loading && (
@@ -443,10 +536,7 @@ export default function Home() {
                   // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                   <div key={index} className="border-l-4 border-blue-500 pl-4">
                     <p className="font-medium text-gray-700 mb-1">{match.heading}</p>
-                    <p
-                      className="text-gray-800 text-sm"
-                      dangerouslySetInnerHTML={{ __html: match.highlightedContext }}
-                    />
+                    {renderMatchContent(match)}
                   </div>
                 ))}
               </div>

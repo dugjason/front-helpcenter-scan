@@ -136,7 +136,7 @@ async function processContent(
   }
 }
 
-// Server-side HTML parsing function
+// Server-side HTML parsing function (text-only mode)
 function findMatchesInHtml(
   html: string,
   searchTerm: string,
@@ -148,10 +148,13 @@ function findMatchesInHtml(
   const headingRegex = /<h([1-6]).*?>(.*?)<\/h\1>/gi
   let lastHeading = ""
   let lastIndex = 0
-  let match
+  let match: RegExpExecArray | null
   let foundHeadings = false
 
-  while ((match = headingRegex.exec(html)) !== null) {
+  while (true) {
+    const match = headingRegex.exec(html)
+    if (match === null) break
+
     foundHeadings = true
     const headingText = match[2].replace(/<.*?>/g, "") // Remove any HTML tags inside heading
     const headingIndex = match.index
@@ -222,10 +225,100 @@ function findMatchesInHtml(
   return matches
 }
 
+// Server-side raw HTML parsing function (raw HTML mode)
+function findMatchesInHtmlRaw(
+  html: string,
+  searchTerm: string,
+): { heading: string; context: string; highlightedContext: string }[] {
+  const matches: { heading: string; context: string; highlightedContext: string }[] = []
+  const searchTermLower = searchTerm.toLowerCase()
+
+  // Extract headings and their content
+  const headingRegex = /<h([1-6]).*?>(.*?)<\/h\1>/gi
+  let lastHeading = ""
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let foundHeadings = false
+
+  while (true) {
+    const match = headingRegex.exec(html)
+    if (match === null) break
+
+    foundHeadings = true
+    const headingText = match[2] // Keep HTML tags inside heading
+    const headingIndex = match.index
+
+    // Check if the heading itself contains the search term
+    if (headingText.toLowerCase().includes(searchTermLower)) {
+      matches.push({
+        heading: lastHeading,
+        context: headingText.trim(),
+        highlightedContext: headingText
+          .trim()
+          .replace(new RegExp(`(${searchTerm})`, "gi"), "<mark>$1</mark>"),
+      })
+    }
+
+    // Get content between this heading and the next one
+    if (lastIndex > 0) {
+      const sectionHtml = html.substring(lastIndex, headingIndex)
+      const sectionText = sectionHtml.replace(/\s+/g, " ")
+
+      // Find sentences containing the search term
+      const sentences = sectionText.split(/(?<=[.!?])\s+/)
+
+      for (const sentence of sentences) {
+        if (sentence.toLowerCase().includes(searchTermLower)) {
+          // Create highlighted version
+          const highlightedSentence = sentence.replace(
+            new RegExp(`(${searchTerm})`, "gi"),
+            "<mark>$1</mark>",
+          )
+
+          matches.push({
+            heading: lastHeading,
+            context: sentence.trim(),
+            highlightedContext: highlightedSentence.trim(),
+          })
+        }
+      }
+    }
+
+    lastHeading = headingText
+    lastIndex = headingIndex + match[0].length
+  }
+
+  // Process the final section after the last heading or the entire content if no headings
+  if ((foundHeadings && lastIndex > 0 && lastIndex < html.length) || !foundHeadings) {
+    const sectionHtml = foundHeadings ? html.substring(lastIndex) : html
+    const sectionText = sectionHtml.replace(/\s+/g, " ")
+
+    const sentences = sectionText.split(/(?<=[.!?])\s+/)
+
+    for (const sentence of sentences) {
+      if (sentence.toLowerCase().includes(searchTermLower)) {
+        const highlightedSentence = sentence.replace(
+          new RegExp(`(${searchTerm})`, "gi"),
+          "<mark>$1</mark>",
+        )
+
+        matches.push({
+          heading: lastHeading,
+          context: sentence.trim(),
+          highlightedContext: highlightedSentence.trim(),
+        })
+      }
+    }
+  }
+
+  return matches
+}
+
 // Main search function
 export async function searchHelpCenter(
   helpCenterUrl: string,
   searchTerm: string,
+  searchHtml = false,
 ): Promise<SearchMatch[]> {
   try {
     const baseUrl = getBaseUrl(helpCenterUrl)
@@ -243,8 +336,10 @@ export async function searchHelpCenter(
         const articleResponse: ArticleResponse = await response.json()
         const { html_content, name, content_url } = articleResponse
 
-        // Use regex-based approach for server-side
-        const matches = findMatchesInHtml(html_content, searchTerm)
+        // Choose the appropriate search function based on mode
+        const matches = searchHtml
+          ? findMatchesInHtmlRaw(html_content, searchTerm)
+          : findMatchesInHtml(html_content, searchTerm)
 
         if (matches.length > 0) {
           const searchMatch: SearchMatch = {
@@ -273,6 +368,7 @@ export async function searchHelpCenter(
 export async function streamSearchResults(formData: FormData) {
   const helpCenterUrl = formData.get("helpCenterUrl") as string
   const searchTerm = formData.get("searchTerm") as string
+  const searchHtml = formData.get("searchHtml") === "true"
 
   if (!helpCenterUrl || !searchTerm) {
     throw new Error("Knowledge Base URL and search term are required")
@@ -314,8 +410,11 @@ export async function streamSearchResults(formData: FormData) {
             const articleResponse: ArticleResponse = await response.json()
             const { html_content, name, content_url } = articleResponse
 
-            // Find matches in the article
-            const matches = findMatchesInHtml(html_content, searchTerm)
+            // Choose the appropriate search function based on mode
+            const matches = searchHtml
+              ? findMatchesInHtmlRaw(html_content, searchTerm)
+              : findMatchesInHtml(html_content, searchTerm)
+
             if (matches.length > 0) {
               foundCount++
 
