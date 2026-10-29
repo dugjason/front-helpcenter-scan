@@ -41,6 +41,42 @@ pnpm dev
 3. Keep the detected Next.js settings and click **Deploy**.
 4. Open the deployment URL when the build completes.
 
+### Deploy with the Vercel CLI
+
+Use this procedure from the repository root. It also works for coding agents such as Codex and Claude Code.
+
+1. Install the [Vercel CLI](https://vercel.com/docs/cli) and sign in:
+
+   ```bash
+   npm install --global vercel
+   vercel login
+   vercel whoami
+   ```
+
+   If sign-in needs a browser, ask the user to complete it. Do not ask the user to paste a token into the chat.
+
+2. Link the directory to a project:
+
+   ```bash
+   vercel link
+   ```
+
+   Select the intended team and project. To use the default team and directory name without prompts, use `vercel link --yes`. This can create a new project. For a specific project, use `vercel link --yes --project <project-name>`.
+
+3. Deploy a preview and open the URL printed by the CLI:
+
+   ```bash
+   vercel deploy --yes
+   ```
+
+4. To deploy to the production domain, run:
+
+   ```bash
+   vercel deploy --prod --yes
+   ```
+
+   The production command updates the project's production deployment. Run it only when a production deployment is intended.
+
 ## Usage
 
 1. Enter the URL of a Front Knowledge Base knowledge base (e.g., https://help.front.com)
